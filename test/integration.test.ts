@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test"
+import { afterAll, describe, expect, test } from "vitest"
 import { createRequire } from "node:module"
 import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
@@ -6,7 +6,8 @@ import { tmpdir } from "node:os"
 import { delimiter, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawn, type ChildProcess } from "node:child_process"
-import { createServer, type Server } from "node:net"
+import { createServer as createNetServer, type Server as NetServer } from "node:net"
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http"
 import { createOpencodeClient, type OpencodeClient } from "@opencode-ai/sdk/v2"
 
 const require = createRequire(import.meta.url)
@@ -39,7 +40,7 @@ function ocodeBin(): string {
   throw new Error("opencode binary not found; set OPENCODE_BIN or install opencode-ai")
 }function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
-    const s: Server = createServer()
+    const s: NetServer = createNetServer()
     s.once("error", reject)
     s.listen(0, "127.0.0.1", () => {
       const port = (s.address() as { port: number }).port
@@ -48,68 +49,58 @@ function ocodeBin(): string {
   })
 }
 
-function startMock() {
+async function startMock() {
   const visionCalls: any[] = []
   const mainCalls: any[] = []
-  const server = Bun.serve({
-    port: 0,
-    fetch: async (req) => {
-      const url = new URL(req.url)
-      if (req.method === "POST" && url.pathname === "/chat/completions") {
-        const body: any = await req.json()
-        const headers = { "content-type": "application/json" }
-        if (body.model === "vision") {
-          visionCalls.push(body)
-          return Response.json(
-            { id: "mock-vision", choices: [{ index: 0, message: { role: "assistant", content: MOCK_DESC } }] },
-            { headers },
-          )
-        }
-        mainCalls.push(body)
-        return Response.json(
-          { id: "mock-main", choices: [{ index: 0, message: { role: "assistant", content: "understood" } }] },
-          { headers },
-        )
-      }
-      return new Response("not found", { status: 404 })
-    },
+  const server: HttpServer = createHttpServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1")
+    if (req.method === "POST" && url.pathname === "/chat/completions") {
+      const chunks: Buffer[] = []
+      req.on("data", (c) => chunks.push(c))
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"))
+        if (body.model === "vision") visionCalls.push(body)
+        else mainCalls.push(body)
+        const json =
+          body.model === "vision"
+            ? { id: "mock-vision", choices: [{ index: 0, message: { role: "assistant", content: MOCK_DESC } }] }
+            : { id: "mock-main", choices: [{ index: 0, message: { role: "assistant", content: "understood" } }] }
+        res.writeHead(200, { "content-type": "application/json" })
+        res.end(JSON.stringify(json))
+      })
+      return
+    }
+    res.writeHead(404)
+    res.end("not found")
   })
-  return { port: server.port, visionCalls, mainCalls, stop: () => server.stop(true) }
-}
-
-import { createConnection, type Socket } from "node:net"
-
-function tcpProbe(host: string, port: number, timeoutMs = 3000): Promise<boolean> {
-  return new Promise((resolve) => {
-    const sock: Socket = createConnection({ host, port })
-    sock.setTimeout(timeoutMs)
-    sock.once("connect", () => {
-      sock.destroy()
-      resolve(true)
-    })
-    sock.once("timeout", () => {
-      sock.destroy()
-      resolve(false)
-    })
-    sock.once("error", () => {
-      sock.destroy()
-      resolve(false)
-    })
-  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const port = (server.address() as { port: number }).port
+  return {
+    port,
+    visionCalls,
+    mainCalls,
+    stop: () =>
+      new Promise<void>((resolve) => {
+        server.closeAllConnections()
+        server.close(() => resolve())
+      }),
+  }
 }
 
 async function waitReady(baseUrl: string, timeoutMs = 120000) {
-  const { port } = new URL(baseUrl)
   const start = Date.now()
   await sleep(2000)
   while (Date.now() - start < timeoutMs) {
-    if (await tcpProbe("127.0.0.1", Number(port))) return
-    await sleep(750)
+    try {
+      const res = await fetch(baseUrl, { signal: AbortSignal.timeout(10000) })
+      if (res.status !== 502 && res.status !== 503) return
+    } catch {}
+    await sleep(1000)
   }
   throw new Error("opencode serve did not become ready")
 }
 
-type Mock = ReturnType<typeof startMock>
+type Mock = Awaited<ReturnType<typeof startMock>>
 
 type Harness = {
   client: OpencodeClient
@@ -128,7 +119,7 @@ async function startServer(mode: "replace" | "delegate"): Promise<Harness> {
   await mkdir(dataDir, { recursive: true })
   await mkdir(cacheDir, { recursive: true })
 
-  const mock = startMock()
+  const mock = await startMock()
 
   await symlink(join(REPO_ROOT, "node_modules"), join(configDir, "node_modules"), process.platform === "win32" ? "junction" : "dir").catch(() => {})
 
@@ -188,7 +179,7 @@ async function startServer(mode: "replace" | "delegate"): Promise<Harness> {
     try {
       proc.kill()
     } catch {}
-    mock.stop()
+    await mock.stop()
     await rm(home, { recursive: true, force: true })
   }
 
@@ -203,6 +194,13 @@ async function sendImagePrompt(client: OpencodeClient, sessionID: string) {
       { type: "text", text: "Describe this image." },
     ],
   })
+}
+
+async function createSession(client: OpencodeClient): Promise<string> {
+  const res = await client.session.create({ model: { providerID: "test-main", id: "main" } })
+  const id = (res as { data?: { id?: string } }).data?.id
+  if (!id) throw new Error(`session.create did not return a session id: ${JSON.stringify(res).slice(0, 500)}`)
+  return id
 }
 
 function agentMainRequest(mock: Mock): any {
@@ -235,7 +233,7 @@ async function boot(mode: "replace" | "delegate"): Promise<Harness> {
 describe("integration", () => {
   test("replace mode replaces the image with an injected vision description", async () => {
     const h = await boot("replace")
-    const sessionID = (await h.client.session.create({ model: { providerID: "test-main", id: "main" } })).data.id
+    const sessionID = await createSession(h.client)
 
     await sendImagePrompt(h.client, sessionID)
 
@@ -258,7 +256,7 @@ describe("integration", () => {
 
   test("delegate mode injects a delegation hint and does not call the vision API", async () => {
     const h = await boot("delegate")
-    const sessionID = (await h.client.session.create({ model: { providerID: "test-main", id: "main" } })).data.id
+    const sessionID = await createSession(h.client)
 
     await sendImagePrompt(h.client, sessionID)
 

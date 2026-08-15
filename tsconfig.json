@@ -5,7 +5,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "es2022",
-    "types": ["node", "bun"]
+    "types": ["node"]
   },
   "include": ["opencode-vision.ts", "test/integration.test.ts"]
 }
