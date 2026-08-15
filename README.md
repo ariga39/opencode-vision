@@ -45,9 +45,24 @@ flowchart TD
 ### Modes
 
 - **replace** (default): the image part is replaced inline with a text description from a vision model (OpenAI-compatible backends only). If no vision backend can be resolved, the plugin automatically falls back to delegate mode.
-- **delegate** (opt-in): the image is saved to a temp path and the agent is instructed to delegate analysis to a vision subagent (e.g. `@vision`). On first use the plugin **auto-creates** `~/.config/opencode/agent/vision.md` (a free `opencode/mimo-v2.5-free` vision subagent) if none exists — restart opencode once after creation. The delegate path uses opencode's own model routing (correct for every model family), so it never needs hand-crafted requests or endpoint whitelists. Enable with `"experimental.vision.mode": "delegate"`.
+- **delegate** (auto): the image is saved to a temp path and the agent is instructed to delegate analysis to a vision subagent (e.g. `@vision`). The plugin falls back to delegate mode whenever it cannot resolve a replace-mode backend: no logged-in/configured vision-capable provider, or the chosen model isn't served over the OpenAI-compatible `chat/completions` protocol (see "Zen multi-protocol routing" below). On first use the plugin **auto-creates** `~/.config/opencode/agent/vision.md` (a free `opencode/mimo-v2.5-free` vision subagent) if none exists — restart opencode once after creation. The delegate path uses opencode's own model routing (correct for every model family), so it never needs hand-crafted requests or endpoint whitelists. There is no config flag to force delegate mode; it is driven by backend availability and model protocol.
 
 ## Install
+
+### From npm (recommended)
+
+Add the package to the `plugin` array in `opencode.json` and restart opencode (it installs automatically at startup):
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@ariga39/opencode-vision"]
+}
+```
+
+The package is self-contained (bundled), so no extra dependencies are needed. For a step-by-step, LLM-friendly walkthrough see [`INSTALL.md`](INSTALL.md).
+
+### From source (manual)
 
 Copy `opencode-vision.ts` into your opencode plugins directory and restart opencode.
 
@@ -87,18 +102,13 @@ You can also switch models from inside a session: ask the agent to run the `visi
         "model": "some-model"
       }
     }
-  },
-  "experimental": {
-    "vision": {
-      "mode": "replace", // "replace" (default) | "delegate"
-      "subagent": "vision",
-      "model": "opencode/mimo-v2.5-free" // optional "provider/model" override for the vision backend
-    }
   }
 }
 ```
 
 The provider API key is read from `~/.local/share/opencode/auth.json`; config-declared providers are also discovered automatically.
+
+> Note: opencode validates its config against a schema and strips unknown keys, so plugin-specific keys such as `experimental.vision.*` are **not** forwarded to plugins. Choose the vision model with the `vision-model.txt` choice file or the `vision_models` / `vision_set_model` tools instead.
 
 ## Limitations
 
@@ -121,9 +131,10 @@ This plugin was inspired by and adapts ideas from:
 ## Development
 
 ```bash
-bun install
-bun run build      # bundle into dist/
-bun run typecheck  # type-check the plugin
+pnpm install
+pnpm build      # bundle into dist/ with tsdown
+pnpm typecheck  # type-check the plugin
+pnpm test       # integration tests (vitest; boots a real opencode server)
 ```
 
 ## License

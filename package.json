@@ -4,11 +4,31 @@
   "type": "module",
   "description": "opencode plugin that auto-describes user-attached images using a vision-capable model, in replace or delegate mode.",
   "license": "MIT",
+  "author": "ariga39",
   "packageManager": "pnpm@11.20.0",
+  "homepage": "https://github.com/ariga39/opencode-vision#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ariga39/opencode-vision.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ariga39/opencode-vision/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "vision",
+    "image",
+    "plugin"
+  ],
   "main": "dist/opencode-vision.js",
   "files": [
-    "dist/"
+    "dist/",
+    "INSTALL.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
