@@ -4,10 +4,8 @@
   "workspaces": {
     "": {
       "name": "opencode-vision",
-      "dependencies": {
-        "@opencode-ai/plugin": "^1.18.10",
-      },
       "devDependencies": {
+        "@opencode-ai/plugin": "^1.18.10",
         "@types/node": "^22.10.0",
         "typescript": "^5.8.2",
       },
