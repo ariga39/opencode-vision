@@ -177,10 +177,19 @@ async function startServer(mode: "replace" | "delegate"): Promise<Harness> {
 
   const cleanup = async () => {
     try {
-      proc.kill()
+      if (proc.exitCode === null && !proc.killed) {
+        proc.kill()
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 5000)
+          proc.once("exit", () => {
+            clearTimeout(timer)
+            resolve()
+          })
+        })
+      }
     } catch {}
     await mock.stop()
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {})
   }
 
   return { client, mock, proc, logs: () => logBuf.join(""), cleanup }
