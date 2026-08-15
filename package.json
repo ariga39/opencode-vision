@@ -9,7 +9,7 @@
     "dist/"
   ],
   "scripts": {
-    "build": "bun build ./opencode-vision.ts --target=bun --outdir ./dist",
+    "build": "bun build ./opencode-vision.ts --target=bun --outdir ./dist --minify",
     "prepack": "bun run build",
     "postpack": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "typecheck": "tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --types node opencode-vision.ts"
