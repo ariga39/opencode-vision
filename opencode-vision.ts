@@ -16,7 +16,7 @@ const IMAGE_TMP_DIR = join(tmpdir(), "opencode-vision")
 
 type Backend = { baseURL: string; apiKey: string; model: string }
 
-let mode: "replace" | "delegate" = "delegate"
+let mode: "replace" | "delegate" = "replace"
 let subagent = "vision"
 let createdAgent = false
 let backend: Backend | null = null
@@ -358,11 +358,14 @@ const plugin: Plugin = async () => ({
   config: async (cfg: Record<string, any>) => {
     providerConfigs = cfg?.provider ?? {}
     const v = cfg?.experimental?.vision ?? {}
-    mode = v.mode === "replace" ? "replace" : "delegate"
+    mode = v.mode === "delegate" ? "delegate" : "replace"
     subagent = typeof v.subagent === "string" && v.subagent ? v.subagent : "vision"
     backend = await resolveBackend(cfg)
     if (mode === "replace" && !backend) mode = "delegate"
-    createdAgent = (await ensureVisionAgent(subagent, typeof v.model === "string" ? v.model : undefined)) !== null
+    createdAgent =
+      mode === "delegate"
+        ? (await ensureVisionAgent(subagent, typeof v.model === "string" ? v.model : undefined)) !== null
+        : false
   },
   "experimental.chat.system.transform": async (input, output) => {
     const model = input.model as any

@@ -44,10 +44,8 @@ flowchart TD
 
 ### Modes
 
-- **delegate** (default): the image is saved to a temp path and the agent is instructed to delegate analysis to a vision subagent (e.g. `@vision`). On first run the plugin **auto-creates** `~/.config/opencode/agent/vision.md` (a free `opencode/mimo-v2.5-free` vision subagent) if none exists, so it works out of the box — restart opencode once after creation.
-- **replace** (opt-in): the image part is replaced inline with a text description from a vision model (OpenAI-compatible backends only). Enable with `"experimental.vision.mode": "replace"`.
-
-The delegate path uses opencode's own model routing (correct for every model family), so it never needs hand-crafted requests or endpoint whitelists.
+- **replace** (default): the image part is replaced inline with a text description from a vision model (OpenAI-compatible backends only). If no vision backend can be resolved, the plugin automatically falls back to delegate mode.
+- **delegate** (opt-in): the image is saved to a temp path and the agent is instructed to delegate analysis to a vision subagent (e.g. `@vision`). On first use the plugin **auto-creates** `~/.config/opencode/agent/vision.md` (a free `opencode/mimo-v2.5-free` vision subagent) if none exists — restart opencode once after creation. The delegate path uses opencode's own model routing (correct for every model family), so it never needs hand-crafted requests or endpoint whitelists. Enable with `"experimental.vision.mode": "delegate"`.
 
 ## Install
 
@@ -92,7 +90,7 @@ You can also switch models from inside a session: ask the agent to run the `visi
   },
   "experimental": {
     "vision": {
-      "mode": "delegate", // "delegate" (default) | "replace"
+      "mode": "replace", // "replace" (default) | "delegate"
       "subagent": "vision",
       "model": "opencode/mimo-v2.5-free" // optional "provider/model" override for the vision backend
     }
