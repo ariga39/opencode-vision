@@ -102,6 +102,16 @@ You can also switch models from inside a session: ask the agent to run the `visi
 
 The provider API key is read from `~/.local/share/opencode/auth.json`; config-declared providers are also discovered automatically.
 
+## Limitations
+
+- **Replace mode speaks OpenAI-compatible APIs only.** It hand-crafts `chat/completions` requests, so it works with OpenAI-compatible gateways and the zen families listed above. Models served via OpenAI `responses`, Anthropic `messages`, or Google protocols (e.g. qwen/claude/gpt/gemini on zen) are excluded and automatically fall back to delegate mode.
+- **Model catalog drift.** Backend resolution reads the models.dev catalog (`models.json`), which updates frequently. A model can be listed in the catalog but not (yet) served by the API (e.g. `kimi-k2.5-free`), which surfaces as an injected error rather than a graceful fallback.
+- **Delegate needs a vision subagent.** opencode ships no built-in vision agent. The plugin auto-creates `~/.config/opencode/agent/vision.md` on first run, but a restart is needed for it to take effect; until then delegation may fail.
+- **Delegate is slower and not inline.** It adds a subagent round-trip, and the description arrives as the subagent's output rather than inline in the message.
+- **Privacy.** In replace mode the image is sent (as base64) to the configured vision backend; in delegate mode the subagent reads the saved image. Free zen models (e.g. `mimo-v2.5-free`) may collect data during their free period — see [opencode's Zen docs](https://opencode.ai/docs/zen/).
+- **Native-vision detection** relies on the session model's reported capabilities; a model that actually supports images but reports otherwise just gets a redundant description (harmless, but costs a call).
+- **In-memory cache.** Descriptions are cached by image hash only for the current process; the cache resets on restart.
+
 ## Acknowledgements
 
 This plugin was inspired by and adapts ideas from:
