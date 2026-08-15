@@ -1,0 +1,22 @@
+{
+  "name": "opencode-vision",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "opencode plugin that auto-describes user-attached images using a vision-capable model, in replace or delegate mode.",
+  "license": "MIT",
+  "main": "opencode-vision.ts",
+  "files": [
+    "opencode-vision.ts"
+  ],
+  "scripts": {
+    "build": "bun build ./opencode-vision.ts --target=bun --outdir ./dist",
+    "typecheck": "tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --target es2022 --types node opencode-vision.ts"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.18.10"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.2"
+  }
+}
