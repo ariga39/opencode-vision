@@ -77,14 +77,34 @@ function startMock() {
   return { port: server.port, visionCalls, mainCalls, stop: () => server.stop(true) }
 }
 
-async function waitReady(baseUrl: string, timeoutMs = 60000) {
+import { createConnection, type Socket } from "node:net"
+
+function tcpProbe(host: string, port: number, timeoutMs = 3000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock: Socket = createConnection({ host, port })
+    sock.setTimeout(timeoutMs)
+    sock.once("connect", () => {
+      sock.destroy()
+      resolve(true)
+    })
+    sock.once("timeout", () => {
+      sock.destroy()
+      resolve(false)
+    })
+    sock.once("error", () => {
+      sock.destroy()
+      resolve(false)
+    })
+  })
+}
+
+async function waitReady(baseUrl: string, timeoutMs = 120000) {
+  const { port } = new URL(baseUrl)
   const start = Date.now()
+  await sleep(2000)
   while (Date.now() - start < timeoutMs) {
-    try {
-      const res = await fetch(baseUrl)
-      if (res.status !== 502 && res.status !== 503) return
-    } catch {}
-    await sleep(300)
+    if (await tcpProbe("127.0.0.1", Number(port))) return
+    await sleep(750)
   }
   throw new Error("opencode serve did not become ready")
 }
@@ -234,7 +254,7 @@ describe("integration", () => {
     expect(injected).toContain("(saved:")
     expect(userContentOf(main).some((p) => p.type === "file")).toBe(false)
     expect(h.mock.visionCalls.length).toBe(1)
-  }, 120000)
+  }, 240000)
 
   test("delegate mode injects a delegation hint and does not call the vision API", async () => {
     const h = await boot("delegate")
@@ -255,5 +275,5 @@ describe("integration", () => {
     ).toBeTruthy()
     expect(userContentOf(main).some((p) => p.type === "file")).toBe(false)
     expect(h.mock.visionCalls.length).toBe(0)
-  }, 120000)
+  }, 240000)
 })

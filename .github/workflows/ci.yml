@@ -27,9 +27,9 @@ jobs:
         run: bun run typecheck
       - name: Build
         run: bun run build
-      - name: Diagnose serve connectivity (linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: bun test/diag-serve.mjs
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Build
+        run: bun run build
       - name: Integration tests
         run: bun test
