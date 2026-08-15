@@ -1,5 +1,5 @@
 {
-  "name": "opencode-vision",
+  "name": "@ariga39/opencode-vision",
   "version": "0.1.0",
   "type": "module",
   "description": "opencode plugin that auto-describes user-attached images using a vision-capable model, in replace or delegate mode.",
