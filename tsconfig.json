@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2022",
+    "types": ["node", "bun"]
+  },
+  "include": ["opencode-vision.ts", "test/integration.test.ts"]
+}
