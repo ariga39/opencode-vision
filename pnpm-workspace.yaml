@@ -1,2 +1,3 @@
 allowBuilds:
   opencode-ai: true
+  msgpackr-extract: true
