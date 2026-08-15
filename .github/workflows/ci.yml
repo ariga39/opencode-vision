@@ -19,10 +19,6 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Install opencode CLI (linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: curl -fsSL https://opencode.ai/install | bash -s -- --version 1.18.18
       - name: Typecheck
         run: bun run typecheck
       - name: Build
