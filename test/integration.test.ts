@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { createRequire } from "node:module"
+import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { delimiter, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawn, type ChildProcess } from "node:child_process"
 import { createServer, type Server } from "node:net"
@@ -20,14 +21,23 @@ function sleep(ms: number) {
 }
 
 function ocodeBin(): string {
-  if (process.env.OPENCODE_BIN) return process.env.OPENCODE_BIN
-  const pkgJson = require.resolve("opencode-ai/package.json")
-  const pkg = require(pkgJson) as { bin: string | Record<string, string> }
-  const rel = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.opencode
-  return join(dirname(pkgJson), rel)
-}
-
-function freePort(): Promise<number> {
+  if (process.env.OPENCODE_BIN && existsSync(process.env.OPENCODE_BIN)) return process.env.OPENCODE_BIN
+  try {
+    const pkgJson = require.resolve("opencode-ai/package.json")
+    const pkg = require(pkgJson) as { bin: string | Record<string, string> }
+    const rel = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.opencode
+    const candidate = join(dirname(pkgJson), rel)
+    if (existsSync(candidate)) return candidate
+  } catch {}
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    const names = process.platform === "win32" ? ["opencode.exe", "opencode"] : ["opencode"]
+    for (const name of names) {
+      const candidate = join(dir, name)
+      if (existsSync(candidate)) return candidate
+    }
+  }
+  throw new Error("opencode binary not found; set OPENCODE_BIN or install opencode-ai")
+}function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const s: Server = createServer()
     s.once("error", reject)
@@ -125,7 +135,8 @@ async function startServer(mode: "replace" | "delegate"): Promise<Harness> {
   )
 
   const port = await freePort()
-  const proc = spawn(ocodeBin(), ["serve", "--port", String(port), "--print-logs"], {
+  const bin = ocodeBin()
+  const proc = spawn(bin, ["serve", "--port", String(port), "--print-logs"], {
     cwd: REPO_ROOT,
     env: {
       ...process.env,
@@ -140,9 +151,17 @@ async function startServer(mode: "replace" | "delegate"): Promise<Harness> {
   const logBuf: string[] = []
   proc.stdout.on("data", (d) => logBuf.push(d.toString()))
   proc.stderr.on("data", (d) => logBuf.push(d.toString()))
+  proc.on("exit", (code, signal) => logBuf.push(`[serve exited code=${code} signal=${signal}]`))
+  proc.on("error", (err) => logBuf.push(`[serve spawn error: ${err.message}]`))
 
   const baseUrl = `http://127.0.0.1:${port}`
-  await waitReady(baseUrl)
+  try {
+    await waitReady(baseUrl)
+  } catch (err) {
+    const logs = logBuf.join("").slice(-4000)
+    const binExists = existsSync(bin)
+    throw new Error(`serve not ready; bin=${bin} exists=${binExists}\nlogs:\n${logs}\noriginal: ${(err as Error).message}`)
+  }
   const client = createOpencodeClient({ baseUrl })
 
   const cleanup = async () => {
